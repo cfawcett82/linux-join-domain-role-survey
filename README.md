@@ -58,6 +58,6 @@ BSD
 
 Author Information
 ------------------
-Cody Fawcett
-cody@bncdiagnostics.com
+Cody Fawcett  
+cody@bncdiagnostics.com  
 https://github.com/cfawcett82
