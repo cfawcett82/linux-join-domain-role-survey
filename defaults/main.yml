@@ -1,0 +1,14 @@
+---
+# defaults file for linux-join-domain-role-survey
+input_host: none
+ad_server_user: user.last@domain.local
+ad_server_pass: 5up3rdup3r53cr3t
+ad_server_domain: domain.local
+ad_server_ldapuri: SHORTNAME_OF_SERVER
+ad_server_ip: IPADDRESS_OF_SERVER
+realm_permit_group: AD_GROUP_NAME
+
+#MUST ESCAPE [SPACES] this is placed in visudo
+#example:
+#default_sudo_group: AD\ GROUP\ NAME
+default_sudo_group: AD_GROUP_NAME

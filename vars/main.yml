@@ -1,0 +1,12 @@
+---
+# vars file for linux-join-domain-role-survey
+required_pkgs:
+  - realmd
+  - sssd
+  - oddjob
+  - oddjob-mkhomedir
+  - adcli
+  - samba-common
+  - samba-common-tools
+  - ntpdate
+  - ntp

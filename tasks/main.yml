@@ -1,0 +1,99 @@
+---
+# tasks file for linux-join-domain-role-survey
+- name: Prep | install required packages
+  yum:
+    name: "{{ required_pkgs }}"
+    state: present
+  notify: 
+    - restart_realmd
+
+- name: Prep | Sync time with AD {{ ad_server_ip }}
+  shell: systemctl stop ntpd ; ntpdate {{ ad_server_ip }} && systemctl start ntpd
+  register: timesync_result
+  changed_when: false
+
+- name: Verify | Checking Domain Join status
+  shell: id {{ ad_server_user }}
+  register: ad_status
+  changed_when: false
+  ignore_errors: true
+
+- name: Prep | Removing existing config files
+  file:
+    path: "{{ item }}"
+    state: absent
+  with_items:
+    - /etc/krb5.keytab
+    - /var/lib/sss/db/*
+    - /var/log/sssd/*
+    - /etc/sssd/sssd.conf
+  when: ad_status.rc != 0
+
+- name: Domain | discovering AD {{ ad_server_domain }}
+  command: realm discover {{ ad_server_domain }}
+  when: ad_status.rc != 0
+
+- name: Domain | Join {{ ansible_hostname }} to {{ ad_server_domain }}
+  command: /bin/bash -c "echo {{ ad_server_pass }} | realm join -v --user={{ ad_server_user }} {{ ad_server_domain }} && sleep 10"
+  register: ad_result
+  until: (ad_result is changed) or
+         (ad_result is succeeded)
+  retries: 10
+  no_log: true
+  when: ad_status.rc != 0
+
+- name: Configue | sssd.conf
+  blockinfile:
+    path: /etc/sssd/sssd.conf
+    block: |
+      [domain/mso.net]
+      ad_domain = {{ ad_server_domain }}
+      ad_site = Default-First-Site-Name
+      krb5_realm = {{ ad_server_domain|uppper }}
+      realmd_tags = manages-system joined-with-samba
+      cache_credentials = True
+      id_provider = ad
+      access_provider = ad
+      auth_provider = ad
+      chpass_provider = ad
+      krb5_store_password_if_offline = True
+      default_shell = /bin/bash
+
+      ldap_uri = ldap://{{ ad_server_ldapuri }}.{{ ad_server_domain }}
+      tls_cacertdir = /etc/ssl/certs/
+      ldap_tls_reqcert = never
+      use_fully_qualified_names = False
+      fallback_homedir = /home/%u
+      homedir_umask = 077
+
+      dyndns_update = true
+      dyndns_refresh_interval = 43200
+      dyndns_update_ptr = true
+      dyndns_ttl = 3600
+
+      ldap_schema = ad
+      sudo_provider = ad
+
+      ldap_id_mapping = true
+      ldap_user_principal = nosuchattribute
+      ldap_sasl_mech = GSSAPI
+      ldap_sudo_full_refresh_interval=86400
+      ldap_sudo_smart_refresh_interval=3600
+
+      ad_gpo_access_control = permissive
+      ad_gpo_cache_timeout = 30
+      ad_gpo_default_right = interactive
+      ad_gpo_map_interactive = +login
+      ad_gpo_map_remote_interactive = +sshd
+  notify:
+    - restart_sssd
+
+- name: Permissions | Allow {{ realm_permit_group }} AD group to log onto the system
+  command: /bin/bash -c "realm permit -g '{{ realm_permit_group }}@{{ ad_server_domain }}'"
+
+- name: Permissions | add {{ realm_permit_group }} team to wheel/sudo
+  lineinfile:
+      path: /etc/sudoers 
+      insertafter: '^%wheel' 
+      line: '%{{ default_sudo_group }}@{{ ad_server_domain }}  ALL=(ALL)  ALL'
+      validate: '/usr/sbin/visudo -cf %s'
