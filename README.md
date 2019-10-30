@@ -43,12 +43,12 @@ none
 Example Playbook
 ----------------
 
-- hosts: "{{ input_host }}"
-  become: yes
-  
-  roles:
-    - linux-join-domain-role-survey
-    - 
+- hosts: "{{ input_host }}"  
+  become: yes  
+    
+  roles:  
+    - linux-join-domain-role-survey  
+
 License
 -------
 
