@@ -49,7 +49,7 @@
       [domain/mso.net]
       ad_domain = {{ ad_server_domain }}
       ad_site = Default-First-Site-Name
-      krb5_realm = {{ ad_server_domain|uppper }}
+      krb5_realm = {{ ad_server_domain|upper }}
       realmd_tags = manages-system joined-with-samba
       cache_credentials = True
       id_provider = ad
