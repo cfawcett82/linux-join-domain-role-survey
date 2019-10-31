@@ -7,7 +7,7 @@
   notify:
     - restart_realmd
 
-- name: prep | stop ntp service
+- name: Prep | stop ntp service
   systemd:
     name: ntpd
     state: stopped
@@ -17,14 +17,14 @@
   register: timesync_result
   changed_when: false
 
-- name:
+- name: Prep | start ntp service
   systemd:
     name: ntpd
     state: started
     enabled: yes
 
 - name: Verify | Checking Domain Join status
-  shell: id {{ ad_server_user }}
+  command: id {{ ad_server_user }}
   register: ad_status
   changed_when: false
   ignore_errors: true
