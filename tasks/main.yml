@@ -4,13 +4,24 @@
   yum:
     name: "{{ required_pkgs }}"
     state: present
-  notify: 
+  notify:
     - restart_realmd
 
+- name: prep | stop ntp service
+  systemd:
+    name: ntpd
+    state: stopped
+
 - name: Prep | Sync time with AD {{ ad_server_ip }}
-  shell: systemctl stop ntpd ; ntpdate {{ ad_server_ip }} && systemctl start ntpd
+  command: ntpdate {{ ad_server_ip }}
   register: timesync_result
   changed_when: false
+
+- name:
+  systemd:
+    name: ntpd
+    state: started
+    enabled: yes
 
 - name: Verify | Checking Domain Join status
   shell: id {{ ad_server_user }}
@@ -93,7 +104,7 @@
 
 - name: Permissions | add {{ realm_permit_group }} team to wheel/sudo
   lineinfile:
-      path: /etc/sudoers 
-      insertafter: '^%wheel' 
+      path: /etc/sudoers
+      insertafter: '^%wheel'
       line: '%{{ default_sudo_group }}@{{ ad_server_domain }}  ALL=(ALL)  ALL'
       validate: '/usr/sbin/visudo -cf %s'

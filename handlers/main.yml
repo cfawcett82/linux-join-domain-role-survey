@@ -1,7 +1,7 @@
 ---
 # handlers file for linux-join-domain-role-survey
 - name: restart_realmd
-  service: 
+  service:
     name: realmd
     state: restarted
 

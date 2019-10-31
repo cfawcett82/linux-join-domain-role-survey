@@ -11,8 +11,10 @@ galaxy_info:
      - 7
      - 8
 
-  galaxy_tags: 
+  galaxy_tags:
     - system
-    - EL
+    - enterpriselinux
+    - el
+    - rhel
     - domain
     - realm
