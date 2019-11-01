@@ -7,51 +7,55 @@
   notify:
     - restart_realmd
 
-- name: Prep | stop ntp service
-  systemd:
-    name: ntpd
-    state: stopped
-
-- name: Prep | Sync time with AD {{ ad_server_ip }}
-  command: ntpdate {{ ad_server_ip }}
-  register: timesync_result
-  changed_when: false
-
-- name: Prep | start ntp service
-  systemd:
-    name: ntpd
-    state: started
-    enabled: yes
-
 - name: Verify | Checking Domain Join status
   command: id {{ ad_server_user }}
   register: ad_status
   changed_when: false
   ignore_errors: true
 
-- name: Prep | Removing existing config files
-  file:
-    path: "{{ item }}"
-    state: absent
-  with_items:
-    - /etc/krb5.keytab
-    - /var/lib/sss/db/*
-    - /var/log/sssd/*
-    - /etc/sssd/sssd.conf
-  when: ad_status.rc != 0
+# Begin block
+- name: Domain | remove configs, discover, and join {{ ad_server_domain }}
+  block:
+    - name: Prep | stop ntp service
+      systemd:
+        name: ntpd
+        state: stopped
 
-- name: Domain | discovering AD {{ ad_server_domain }}
-  command: realm discover {{ ad_server_domain }}
-  when: ad_status.rc != 0
+    - name: Prep | Sync time with AD {{ ad_server_ip }}
+      command: ntpdate {{ ad_server_ip }}
+      register: timesync_result
+      changed_when: false
 
-- name: Domain | Join {{ ansible_hostname }} to {{ ad_server_domain }}
-  command: /bin/bash -c "echo {{ ad_server_pass }} | realm join -v --user={{ ad_server_user }} {{ ad_server_domain }} && sleep 10"
-  register: ad_result
-  until: (ad_result is changed) or
-         (ad_result is succeeded)
-  retries: 10
-  no_log: true
+    - name: Prep | start ntp service
+      systemd:
+        name: ntpd
+        state: started
+        enabled: yes
+
+    - name: Prep | Removing existing config files
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - /etc/krb5.keytab
+        - /var/lib/sss/db/*
+        - /var/log/sssd/*
+        - /etc/sssd/sssd.conf
+
+    - name: Domain | discovering AD {{ ad_server_domain }}
+      command: realm discover {{ ad_server_domain }}
+
+    - name: Domain | Join {{ ansible_hostname }} to {{ ad_server_domain }}
+      command: /bin/bash -c "echo {{ ad_server_pass }} | realm join -v --user={{ ad_server_user }} {{ ad_server_domain }} && sleep 10"
+      register: ad_result
+      until: (ad_result is changed) or
+             (ad_result is succeeded)
+      retries: 10
+      no_log: true
+# Block Conditionals
   when: ad_status.rc != 0
+# End block
+
 
 - name: Configue | sssd.conf
   blockinfile:
@@ -99,12 +103,18 @@
   notify:
     - restart_sssd
 
+- name: Verify | read /etc/sssd/sssd.conf
+  command: cat /etc/sssd/sssd.conf
+  register: sssd_conf_content
+  changed_when: sssd_conf_content.rc != 0
+
 - name: Permissions | Allow {{ realm_permit_group }} AD group to log onto the system
   command: /bin/bash -c "realm permit -g '{{ realm_permit_group }}@{{ ad_server_domain }}'"
+  when: sssd_conf_content.stdout.find(realm_permit_group ~ '@' ~ ad_server_domain) != -1
 
 - name: Permissions | add {{ realm_permit_group }} team to wheel/sudo
   lineinfile:
-      path: /etc/sudoers
-      insertafter: '^%wheel'
-      line: '%{{ default_sudo_group }}@{{ ad_server_domain }}  ALL=(ALL)  ALL'
-      validate: '/usr/sbin/visudo -cf %s'
+    path: /etc/sudoers
+    insertafter: '^%wheel'
+    line: '%{{ default_sudo_group }}@{{ ad_server_domain }}  ALL=(ALL)  ALL'
+    validate: '/usr/sbin/visudo -cf %s'
